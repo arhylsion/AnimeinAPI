@@ -11,6 +11,9 @@ from ..models import (
     Ad,
     AnimeDetail,
     AnimeSummary,
+    BulkRequest,
+    BulkResult,
+    CatalogStats,
     ChatData,
     CommentList,
     Episode,
@@ -153,6 +156,38 @@ async def ads(
 ) -> Ad | None:
     try:
         return await service.get_ads(tag=tag)
+    except UpstreamError as exc:
+        raise _err(exc) from exc
+
+
+@router.post("/bulk/anime", tags=["bulk"])
+async def bulk_anime(
+    service: Svc,
+    body: BulkRequest,
+) -> BulkResult[AnimeDetail]:
+    return await service.get_anime_bulk(body.ids)
+
+
+@router.post("/bulk/streams", tags=["bulk"])
+async def bulk_streams(
+    service: Svc,
+    body: BulkRequest,
+) -> BulkResult[StreamResponse]:
+    return await service.get_streams_bulk(body.ids)
+
+
+@router.post("/bulk/episodes", tags=["bulk"])
+async def bulk_episodes(
+    service: Svc,
+    body: BulkRequest,
+) -> BulkResult[list[Episode]]:
+    return await service.get_episodes_bulk(body.ids)
+
+
+@router.get("/stats", tags=["meta"])
+async def catalog_stats(service: Svc) -> CatalogStats:
+    try:
+        return await service.get_catalog_stats()
     except UpstreamError as exc:
         raise _err(exc) from exc
 

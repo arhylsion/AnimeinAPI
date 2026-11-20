@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
+
+T = TypeVar("T")
 
 
 class AnimeSummary(BaseModel):
@@ -53,6 +55,10 @@ class StreamInfo(BaseModel):
     domain: str | None = None
     username: str | None = None
     server_id: str | None = None
+
+    @property
+    def is_rapsodi(self) -> bool:
+        return (self.name or "").upper() == "RAPSODI" or (self.type or "") == "direct"
 
 
 class StreamResponse(BaseModel):
@@ -170,3 +176,26 @@ class HomeData(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+class BulkRequest(BaseModel):
+    ids: list[str] = Field(..., description="Daftar ID yang ingin diambil secara bulk")
+
+
+class BulkResult(BaseModel, Generic[T]):
+    items: dict[str, T] = Field(
+        default_factory=dict, description="Dictionary hasil sukses per ID"
+    )
+    errors: dict[str, str] = Field(
+        default_factory=dict, description="Dictionary pesan error per ID yang gagal"
+    )
+    total_requested: int = Field(0, description="Total ID yang diminta")
+    total_success: int = Field(0, description="Total ID yang berhasil")
+    total_failed: int = Field(0, description="Total ID yang gagal")
+
+
+class CatalogStats(BaseModel):
+    total_anime: int = Field(..., description="Total judul anime di katalog")
+    total_episodes: str = Field(..., description="Estimasi total episode yang tersedia")
+    total_genres: int = Field(..., description="Total kategori genre dan tema")
+    last_updated: str = Field(..., description="Waktu pengecekan statistik (WIB/ISO)")

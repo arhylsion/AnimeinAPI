@@ -28,14 +28,38 @@ class Metrics:
     def __init__(self) -> None:
         self.counts: dict[str, int] = {}
         self.durations: dict[str, deque] = {}
+        self.upstream_total: int = 0
+        self.upstream_success: int = 0
+        self.upstream_failed: int = 0
+        self.upstream_durations: deque = deque(maxlen=self.WINDOW)
 
     def record(self, path: str, seconds: float) -> None:
         self.counts[path] = self.counts.get(path, 0) + 1
         bucket = self.durations.setdefault(path, deque(maxlen=self.WINDOW))
         bucket.append(seconds)
 
+    def record_upstream(self, success: bool, seconds: float) -> None:
+        self.upstream_total += 1
+        if success:
+            self.upstream_success += 1
+        else:
+            self.upstream_failed += 1
+        self.upstream_durations.append(seconds)
+
     def snapshot(self) -> dict:
         out: dict = {}
+        rate = (
+            round((self.upstream_success / self.upstream_total * 100), 2)
+            if self.upstream_total > 0
+            else 100.0
+        )
+        out["_upstream"] = {
+            "total_calls": self.upstream_total,
+            "success_calls": self.upstream_success,
+            "failed_calls": self.upstream_failed,
+            "success_rate_percent": rate,
+            "meets_target_92_5": rate >= 92.5,
+        }
         for path, bucket in self.durations.items():
             samples = sorted(bucket)
             n = len(samples)
@@ -64,13 +88,14 @@ async def timing(request: Request, call_next):
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    http = HttpClient(settings)
+    metrics = Metrics()
+    http = HttpClient(settings, on_upstream_result=metrics.record_upstream)
     cache = Cache()
     service = AnimeinService(http, cache, settings)
     app.state.http = http
     app.state.cache = cache
     app.state.service = service
-    app.state.metrics = Metrics()
+    app.state.metrics = metrics
 
     warmup = asyncio.create_task(warmup_jobs(service))
     yield
@@ -81,6 +106,7 @@ async def lifespan(app: FastAPI):
 async def warmup_jobs(service: AnimeinService) -> None:
     tasks = [
         asyncio.create_task(service.get_genres()),
+        asyncio.create_task(service.get_home()),
         *[
             asyncio.create_task(service.get_schedule(day))
             for day in ("SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU")
@@ -98,11 +124,11 @@ def create_app() -> FastAPI:
     logging.getLogger("animeinapi").setLevel(settings.log_level.upper())
 
     app = FastAPI(
-        title="AnimeinAPI v2",
+        title="AnimeinAPI",
         version=__version__,
         description=(
-            "Provider stream anime multi-resolusi (360p/480p/720p/1080p) "
-            "dari backend JSON publik animeinweb.com."
+            "Provider API media stream anime berbasis komunitas Animein "
+            "dan storage cluster RAPSODI (direct MP4 multi-resolusi 360p-1080p)."
         ),
         lifespan=lifespan,
     )
@@ -114,7 +140,7 @@ def create_app() -> FastAPI:
 
     @app.get("/", include_in_schema=False)
     async def root() -> dict:
-        return {"name": "AnimeinAPI v2", "version": __version__}
+        return {"name": "AnimeinAPI", "version": __version__}
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict:

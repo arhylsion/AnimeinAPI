@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime, timedelta, timezone
+
 from ..config import Settings
 from ..core.cache import Cache, Cached
 from ..core.client import HttpClient, UpstreamError
@@ -13,6 +16,7 @@ from ..core.constants import (
     TTL_HOME,
     TTL_SCHEDULE,
     TTL_SEARCH,
+    TTL_STATS,
     TTL_STREAMS,
     TTL_TRAILERS,
 )
@@ -20,6 +24,8 @@ from ..models import (
     Ad,
     AnimeDetail,
     AnimeSummary,
+    BulkResult,
+    CatalogStats,
     ChatData,
     CommentList,
     Episode,
@@ -169,6 +175,9 @@ class AnimeinService:
             info = StreamInfo.model_validate(server)
             streams.setdefault(info.quality, []).append(info)
 
+        for q in streams:
+            streams[q].sort(key=lambda s: 0 if s.is_rapsodi else 1)
+
         episode_next = data.get("episode_next")
         return StreamResponse(
             episode=episode,
@@ -220,3 +229,80 @@ class AnimeinService:
         payload = await self._get("data/ads/show", tag=tag)
         ad = (payload.get("data") or {}).get("ad")
         return Ad.model_validate(ad) if ad else None
+
+    async def get_anime_bulk(self, anime_ids: list[str]) -> BulkResult[AnimeDetail]:
+        tasks = [self.get_anime(aid) for aid in anime_ids]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        items: dict[str, AnimeDetail] = {}
+        errors: dict[str, str] = {}
+        for aid, res in zip(anime_ids, results, strict=False):
+            if isinstance(res, Exception):
+                errors[aid] = str(res)
+            else:
+                items[aid] = res
+        return BulkResult(
+            items=items,
+            errors=errors,
+            total_requested=len(anime_ids),
+            total_success=len(items),
+            total_failed=len(errors),
+        )
+
+    async def get_streams_bulk(self, episode_ids: list[str]) -> BulkResult[StreamResponse]:
+        tasks = [self.get_streams(eid) for eid in episode_ids]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        items: dict[str, StreamResponse] = {}
+        errors: dict[str, str] = {}
+        for eid, res in zip(episode_ids, results, strict=False):
+            if isinstance(res, Exception):
+                errors[eid] = str(res)
+            else:
+                items[eid] = res
+        return BulkResult(
+            items=items,
+            errors=errors,
+            total_requested=len(episode_ids),
+            total_success=len(items),
+            total_failed=len(errors),
+        )
+
+    async def get_episodes_bulk(self, anime_ids: list[str]) -> BulkResult[list[Episode]]:
+        tasks = [self.get_episodes(aid) for aid in anime_ids]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        items: dict[str, list[Episode]] = {}
+        errors: dict[str, str] = {}
+        for aid, res in zip(anime_ids, results, strict=False):
+            if isinstance(res, Exception):
+                errors[aid] = str(res)
+            else:
+                items[aid] = res
+        return BulkResult(
+            items=items,
+            errors=errors,
+            total_requested=len(anime_ids),
+            total_success=len(items),
+            total_failed=len(errors),
+        )
+
+    async def get_catalog_stats(self) -> CatalogStats:
+        cached = await self._cached(("catalog_stats",), TTL_STATS, self._get_catalog_stats)
+        return cached.data
+
+    async def _get_catalog_stats(self) -> CatalogStats:
+        genres = await self.get_genres()
+        total_movies = 4896
+        try:
+            p81 = await self._get("3/2/explore/movie", page=81, sort="views")
+            movies = (p81.get("data") or {}).get("movie") or []
+            if movies:
+                total_movies = 81 * 60 + len(movies)
+        except Exception:
+            pass
+        wib = datetime.now(timezone(timedelta(hours=7)))
+        return CatalogStats(
+            total_anime=total_movies,
+            total_episodes="78.000+",
+            total_genres=len(genres),
+            last_updated=wib.strftime("%Y-%m-%d %H:%M:%S WIB"),
+        )
+
