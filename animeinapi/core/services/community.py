@@ -22,10 +22,11 @@ class CommunityServiceMixin:
     async def get_comments(
         self, episode_id: str, sort: str = "new", page: int = 0
     ) -> CommentList:
+        resolved_id = await self.resolve_episode_id(episode_id)
         cached = await self._cached(
-            ("comments", episode_id, sort, page),
+            ("comments", resolved_id, sort, page),
             TTL_COMMENTS,
-            lambda: self._get_comments(episode_id, sort, page),
+            lambda: self._get_comments(resolved_id, sort, page),
         )
         return cached.data
 

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class AnimeSummary(BaseModel):
     id: str
+    slug: str | None = None
     title: str
     synopsis: str | None = None
     synonyms: str | None = None

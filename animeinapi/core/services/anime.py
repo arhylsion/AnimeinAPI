@@ -24,15 +24,16 @@ class AnimeServiceMixin:
         movies = (
             data if isinstance(data, list) else (data.get("movies") or data.get("movie") or [])
         )
-        items = [AnimeSummary.model_validate(m) for m in movies]
+        items = self._index_anime_list([AnimeSummary.model_validate(m) for m in movies])
         total = None
         if isinstance(data, dict):
             total = data.get("total_movies") or data.get("total")
         return SearchResult(page=page, total=total or len(items), items=items)
 
     async def get_anime(self, anime_id: str) -> AnimeDetail:
+        resolved_id = await self.resolve_anime_id(anime_id)
         cached = await self._cached(
-            ("anime", anime_id), TTL_DETAIL, lambda: self._get_anime(anime_id)
+            ("anime", resolved_id), TTL_DETAIL, lambda: self._get_anime(resolved_id)
         )
         return cached.data
 
@@ -42,13 +43,14 @@ class AnimeServiceMixin:
         movie = data.get("movie") if isinstance(data, dict) else None
         if not movie:
             raise UpstreamError("Empty movie detail from upstream")
-        return AnimeDetail.model_validate(movie)
+        return self._index_anime(AnimeDetail.model_validate(movie))
 
     async def get_episodes(self, anime_id: str, page: int = 0) -> list[Episode]:
+        resolved_id = await self.resolve_anime_id(anime_id)
         cached = await self._cached(
-            ("episodes", anime_id, page),
+            ("episodes", resolved_id, page),
             TTL_EPISODES,
-            lambda: self._get_episodes(anime_id, page),
+            lambda: self._get_episodes(resolved_id, page),
         )
         return cached.data
 
@@ -57,6 +59,9 @@ class AnimeServiceMixin:
         data = payload.get("data") or []
         episodes = data if isinstance(data, list) else data.get("episode") or []
         items = [Episode.model_validate(ep) for ep in episodes]
+
+        anime_slug = self._slug_index.get_anime_slug(anime_id)
+        self._index_episode_list(items, anime_id=anime_id, anime_slug=anime_slug)
 
         def sort_key(ep: Episode) -> int:
             try:
@@ -67,8 +72,9 @@ class AnimeServiceMixin:
         return sorted(items, key=sort_key)
 
     async def get_trailers(self, anime_id: str) -> list[Trailer]:
+        resolved_id = await self.resolve_anime_id(anime_id)
         cached = await self._cached(
-            ("trailers", anime_id), TTL_TRAILERS, lambda: self._get_trailers(anime_id)
+            ("trailers", resolved_id), TTL_TRAILERS, lambda: self._get_trailers(resolved_id)
         )
         return cached.data
 

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class Episode(BaseModel):
     id: str
+    slug: str | None = None
     index: str
     title: str
     views: str | None = None
