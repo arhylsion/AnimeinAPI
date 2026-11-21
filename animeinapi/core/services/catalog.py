@@ -25,7 +25,18 @@ class CatalogServiceMixin:
 
     async def _get_home(self, day: str, limit: int) -> HomeData:
         payload = await self._get("3/2/home/data", day=day, limit=limit)
-        return HomeData.model_validate(payload.get("data") or {})
+        home = HomeData.model_validate(payload.get("data") or {})
+        for section in (
+            home.hot,
+            home.new,
+            home.today,
+            home.popular,
+            home.waiting,
+            home.random,
+            home.trailer,
+        ):
+            self._index_anime_list(section)
+        return home
 
     async def get_schedule(self, day: str = "RANDOM") -> list[AnimeSummary]:
         cached = await self._cached(
@@ -37,7 +48,7 @@ class CatalogServiceMixin:
         payload = await self._get("3/2/schedule/data", day=day)
         data = payload.get("data") or {}
         movies = data.get("movie") if isinstance(data, dict) else data or []
-        return [AnimeSummary.model_validate(m) for m in movies]
+        return self._index_anime_list([AnimeSummary.model_validate(m) for m in movies])
 
     async def get_catalog_stats(self) -> CatalogStats:
         cached = await self._cached(("catalog_stats",), TTL_STATS, self._get_catalog_stats)

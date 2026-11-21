@@ -14,6 +14,7 @@ from .api.routes import router
 from .config import get_settings
 from .core.cache import Cache
 from .core.client import HttpClient
+from .core.index import SlugIndex
 from .core.metrics import Metrics, timing
 from .core.service import AnimeinService
 
@@ -26,9 +27,11 @@ async def lifespan(app: FastAPI):
     metrics = Metrics()
     http = HttpClient(settings, on_upstream_result=metrics.record_upstream)
     cache = Cache()
-    service = AnimeinService(http, cache, settings)
+    slug_index = SlugIndex()
+    service = AnimeinService(http, cache, settings, slug_index=slug_index)
     app.state.http = http
     app.state.cache = cache
+    app.state.slug_index = slug_index
     app.state.service = service
     app.state.metrics = metrics
 
