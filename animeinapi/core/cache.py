@@ -87,7 +87,7 @@ class Cache:
             if not future.done():
                 future.set_result(value)
         except Exception:
-            self._reject(future, UpstreamError(f"Fetch gagal untuk {key}"))
+            self._reject(future, UpstreamError(f"Fetch failed for {key}"))
             raise
         finally:
             self._pending.pop(key, None)
@@ -111,9 +111,9 @@ class Cache:
     ) -> None:
         try:
             await self._load(key, ttl, stale_ttl, negative_ttl, fetch)
-            logger.info("SWR refresh selesai untuk %s", key)
+            logger.info("SWR refresh completed for %s", key)
         except Exception:
-            logger.exception("SWR refresh gagal untuk %s", key)
+            logger.exception("SWR refresh failed for %s", key)
 
     async def _put(self, key: str, value: Any, ttl: float, stale_ttl: float | None = None) -> None:
         now = time.monotonic()

@@ -22,4 +22,5 @@ config.py
 
 .DS_Store
 Thumbs.db
+*.egg-info/
 !flake.nix
