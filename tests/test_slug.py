@@ -51,11 +51,15 @@ def test_slugify_and_episode_helpers():
 
     ep_slug = make_episode_slug("naruto-shippuuden", "25")
     assert ep_slug == "naruto-shippuuden-episode-25"
-    assert (
-        make_episode_slug("naruto-shippuuden", "25", disambiguator="999")
-        == "naruto-shippuuden-episode-25-999"
-    )
     assert parse_episode_slug(ep_slug) == ("naruto-shippuuden", "25")
+
+    fractional_slug = make_episode_slug("naruto-shippuuden", "1.5")
+    assert fractional_slug == "naruto-shippuuden-episode-1-5"
+    assert parse_episode_slug(fractional_slug) == ("naruto-shippuuden", "1-5")
+
+    dis_slug = make_episode_slug("naruto-shippuuden", "25", disambiguator="999")
+    assert dis_slug == "naruto-shippuuden-episode-25-999"
+    assert parse_episode_slug(dis_slug) == ("naruto-shippuuden", "25-999")
     assert parse_episode_slug("invalid-slug-without-marker") is None
 
 

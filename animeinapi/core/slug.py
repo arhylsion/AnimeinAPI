@@ -4,7 +4,7 @@ import re
 import unicodedata
 
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
-_EPISODE_SLUG_RE = re.compile(r"^(.+)-episode-([a-z0-9]+)$")
+_EPISODE_SLUG_RE = re.compile(r"^(.+)-episode-([a-z0-9]+(?:-[a-z0-9]+)*)$")
 
 
 def slugify(text: str) -> str:
@@ -37,7 +37,7 @@ def make_episode_slug(
 
 def parse_episode_slug(slug: str) -> tuple[str, str] | None:
     """Extract (anime_slug, episode_index) from '{anime_slug}-episode-{index}'."""
-    normalized = slug.strip().lower()
+    normalized = slugify(slug)
     match = _EPISODE_SLUG_RE.match(normalized)
     if not match:
         return None

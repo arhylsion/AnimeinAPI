@@ -154,6 +154,10 @@ class BaseService:
         anime_slug, ep_index = parsed
         anime_id = await self.resolve_anime_id(anime_slug)
 
+        hit_by_slug = self._slug_index.get_episode_id(target_slug)
+        if hit_by_slug:
+            return hit_by_slug
+
         hit_by_idx = self._slug_index.get_episode_id_by_index(anime_id, ep_index)
         if hit_by_idx:
             return hit_by_idx
@@ -162,6 +166,9 @@ class BaseService:
             episodes = await self._fetch_cached_episodes(anime_id, page=page)
             if not episodes:
                 break
+            hit_by_slug = self._slug_index.get_episode_id(target_slug)
+            if hit_by_slug:
+                return hit_by_slug
             hit_by_idx = self._slug_index.get_episode_id_by_index(anime_id, ep_index)
             if hit_by_idx:
                 return hit_by_idx
