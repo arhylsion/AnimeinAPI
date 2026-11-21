@@ -20,10 +20,19 @@ def is_numeric_id(value: str) -> bool:
     return bool(s) and s.isdigit()
 
 
-def make_episode_slug(anime_slug: str, episode_index: str) -> str:
+def make_episode_slug(
+    anime_slug: str,
+    episode_index: str,
+    disambiguator: str | None = None,
+) -> str:
     """Format a flat episode slug as '{anime_slug}-episode-{index}'."""
     clean_index = slugify(str(episode_index)) or str(episode_index).strip()
-    return f"{anime_slug}-episode-{clean_index}"
+    base = f"{anime_slug}-episode-{clean_index}"
+    if disambiguator:
+        clean_dis = slugify(str(disambiguator)) or str(disambiguator).strip()
+        if clean_dis:
+            return f"{base}-{clean_dis}"
+    return base
 
 
 def parse_episode_slug(slug: str) -> tuple[str, str] | None:

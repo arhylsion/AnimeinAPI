@@ -51,13 +51,16 @@ def test_slugify_and_episode_helpers():
 
     ep_slug = make_episode_slug("naruto-shippuuden", "25")
     assert ep_slug == "naruto-shippuuden-episode-25"
+    assert (
+        make_episode_slug("naruto-shippuuden", "25", disambiguator="999")
+        == "naruto-shippuuden-episode-25-999"
+    )
     assert parse_episode_slug(ep_slug) == ("naruto-shippuuden", "25")
     assert parse_episode_slug("invalid-slug-without-marker") is None
 
 
 def test_slug_index_collision_disambiguation():
     idx = SlugIndex()
-    # 1. Year-based disambiguation and same-year ID fallback
     s1 = idx.register_anime("100", "Hunter x Hunter", year="1999")
     s2 = idx.register_anime("200", "Hunter x Hunter", year="2011")
     s3 = idx.register_anime("300", "Hunter x Hunter", year="2011")
@@ -66,16 +69,18 @@ def test_slug_index_collision_disambiguation():
     assert s2 == "hunter-x-hunter-2011"
     assert s3 == "hunter-x-hunter-300"
 
-    # 2. Direct -{aid} fallback when year is None/missing
-    s4 = idx.register_anime("400", "Bleach", year=None)
-    s5 = idx.register_anime("500", "Bleach", year=None)
-    assert s4 == "bleach"
-    assert s5 == "bleach-500"
-
     assert idx.get_anime_id("hunter-x-hunter") == "100"
     assert idx.get_anime_id("hunter-x-hunter-2011") == "200"
     assert idx.get_anime_id("hunter-x-hunter-300") == "300"
     assert idx.get_anime_id("hunter-x-hunter-100") == "100"
+
+
+def test_slug_index_collision_disambiguation_with_aid():
+    idx = SlugIndex()
+    s1 = idx.register_anime("400", "Bleach", year=None)
+    s2 = idx.register_anime("500", "Bleach", year=None)
+    assert s1 == "bleach"
+    assert s2 == "bleach-500"
     assert idx.get_anime_id("bleach") == "400"
     assert idx.get_anime_id("bleach-500") == "500"
 
@@ -186,6 +191,39 @@ async def test_episode_slug_and_nested_stream_resolution(service):
             "haikyuu-second-season", "25"
         )
         assert nested_res.episode.id == "35969"
+
+
+async def test_get_episode_streams_by_index_pagination_and_not_found(service):
+    with respx.mock(base_url=PROXY_URL) as mock:
+        # Page 0 has 30 episodes (indices 1..30), page 1 has episode 31 (id 90031)
+        page0_episodes = [
+            {"id": str(80000 + i), "index": str(i), "title": f"Episode {i}", "id_movie": "2073"}
+            for i in range(1, 31)
+        ]
+        page1_episodes = [
+            {"id": "90031", "index": "31", "title": "Episode 31", "id_movie": "2073"}
+        ]
+        mock.get("/3/2/movie/episode/2073", params={"page": 0}).mock(
+            return_value=Response(
+                200, json={"status": 200, "error": False, "data": {"episode": page0_episodes}}
+            )
+        )
+        mock.get("/3/2/movie/episode/2073", params={"page": 1}).mock(
+            return_value=Response(
+                200, json={"status": 200, "error": False, "data": {"episode": page1_episodes}}
+            )
+        )
+        mock.get("/3/2/episode/streamnew/90031").mock(
+            return_value=Response(200, json=load("streams.json"))
+        )
+
+        # Resolves episode 31 from page 1 (0-based pagination: page=0 -> page=1)
+        res = await service.get_episode_streams_by_index("2073", "31")
+        assert res.episode.id == "35969"
+
+        # Non-existent episode index stops after page 1 (len < 30) and raises UpstreamNotFound
+        with pytest.raises(UpstreamNotFound):
+            await service.get_episode_streams_by_index("2073", "999")
 
 
 async def test_bulk_mixed_slugs_and_numeric_ids(service):

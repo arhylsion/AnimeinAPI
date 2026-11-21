@@ -77,8 +77,7 @@ class SlugIndex:
         ep_slug = make_episode_slug(resolved_anime_slug, idx_norm)
         ep_owner = self._ep_slug_to_id.get(ep_slug)
         if ep_owner is not None and ep_owner != eid:
-            # Disambiguate episode slug collision with episode ID
-            ep_slug = f"{ep_slug}-{eid}"
+            ep_slug = make_episode_slug(resolved_anime_slug, idx_norm, disambiguator=eid)
 
         self._ep_slug_to_id[ep_slug] = eid
         self._ep_id_to_slug[eid] = ep_slug
