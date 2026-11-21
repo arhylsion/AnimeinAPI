@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import statistics
 import time
 from collections import deque
@@ -46,13 +47,16 @@ class Metrics:
             "meets_target_92_5": rate >= 92.5,
         }
         for path, bucket in self.durations.items():
+            if not bucket:
+                continue
             samples = sorted(bucket)
             n = len(samples)
+            p95_idx = min(max(math.ceil(n * 0.95) - 1, 0), n - 1)
             out[path] = {
                 "count": self.counts.get(path, 0),
                 "avg_ms": round(statistics.mean(samples) * 1000, 2),
                 "p50_ms": round(samples[n // 2] * 1000, 2),
-                "p95_ms": round(samples[min(int(n * 0.95), n - 1)] * 1000, 2),
+                "p95_ms": round(samples[p95_idx] * 1000, 2),
                 "max_ms": round(samples[-1] * 1000, 2),
             }
         return out

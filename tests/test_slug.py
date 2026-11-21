@@ -57,6 +57,7 @@ def test_slugify_and_episode_helpers():
 
 def test_slug_index_collision_disambiguation():
     idx = SlugIndex()
+    # 1. Year-based disambiguation and same-year ID fallback
     s1 = idx.register_anime("100", "Hunter x Hunter", year="1999")
     s2 = idx.register_anime("200", "Hunter x Hunter", year="2011")
     s3 = idx.register_anime("300", "Hunter x Hunter", year="2011")
@@ -65,11 +66,42 @@ def test_slug_index_collision_disambiguation():
     assert s2 == "hunter-x-hunter-2011"
     assert s3 == "hunter-x-hunter-300"
 
+    # 2. Direct -{aid} fallback when year is None/missing
+    s4 = idx.register_anime("400", "Bleach", year=None)
+    s5 = idx.register_anime("500", "Bleach", year=None)
+    assert s4 == "bleach"
+    assert s5 == "bleach-500"
+
     assert idx.get_anime_id("hunter-x-hunter") == "100"
     assert idx.get_anime_id("hunter-x-hunter-2011") == "200"
     assert idx.get_anime_id("hunter-x-hunter-300") == "300"
-    # Direct ID alias also resolves
     assert idx.get_anime_id("hunter-x-hunter-100") == "100"
+    assert idx.get_anime_id("bleach") == "400"
+    assert idx.get_anime_id("bleach-500") == "500"
+
+
+def test_slug_index_alias_does_not_shadow_existing_entry():
+    idx = SlugIndex()
+    # Anime 10 has title "Foo 20", so its canonical slug is "foo-20"
+    first = idx.register_anime("10", "Foo 20")
+    assert first == "foo-20"
+    # Anime 20 has title "Foo", so its synthetic alias would be "foo-20"
+    second = idx.register_anime("20", "Foo")
+    assert second == "foo"
+    # "foo-20" must still resolve to anime "10", not be overwritten by anime "20"'s synthetic alias
+    assert idx.get_anime_id("foo-20") == "10"
+    assert idx.get_anime_id("foo") == "20"
+
+
+def test_register_episode_none_and_collision_disambiguation():
+    idx = SlugIndex()
+    idx.register_anime("2073", "Haikyuu")
+    assert idx.register_episode("1", None, anime_id="2073") is None
+    assert idx.register_episode("10", 5, anime_id="2073") == "haikyuu-episode-5"
+    # Colliding episode ID for the same anime + episode index is disambiguated with -{eid}
+    assert idx.register_episode("11", 5, anime_id="2073") == "haikyuu-episode-5-11"
+    assert idx.get_episode_id("haikyuu-episode-5") == "10"
+    assert idx.get_episode_id("haikyuu-episode-5-11") == "11"
 
 
 async def test_passive_indexing_and_warm_slug_lookup(service):
@@ -98,7 +130,6 @@ async def test_passive_indexing_and_warm_slug_lookup(service):
         assert search_res.items[0].slug == "haikyuu-second-season"
         assert search_res.items[1].slug == "tsue-to-tsurugi-no-wistoria"
 
-        # Warm lookup by character slug hits numeric detail endpoint /3/2/movie/detail/2073
         detail = await service.get_anime("haikyuu-second-season")
         assert detail.id == "2073"
         assert detail.slug == "haikyuu-second-season"
@@ -126,7 +157,6 @@ async def test_cold_anime_slug_search_fallback(service):
             )
         )
 
-        # Cold lookup with empty index triggers search fallback and resolves to ID 2073
         detail = await service.get_anime("haikyuu-second-season")
         assert detail.id == "2073"
         assert detail.slug == "haikyuu-second-season"
@@ -205,7 +235,9 @@ async def test_bulk_mixed_slugs_and_numeric_ids(service):
 async def test_unknown_slug_raises_not_found(service):
     with respx.mock(base_url=PROXY_URL) as mock:
         mock.get("/3/2/explore/movie").mock(
-            return_value=Response(200, json={"status": 200, "error": False, "data": {"movies": []}})
+            return_value=Response(
+                200, json={"status": 200, "error": False, "data": {"movies": []}}
+            )
         )
         with pytest.raises(UpstreamNotFound):
             await service.get_anime("nonexistent-anime-slug")

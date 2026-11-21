@@ -20,7 +20,7 @@ class StreamServiceMixin:
         ep_id = self._slug_index.get_episode_id_by_index(anime_id, episode_index)
         if not ep_id:
             for page in range(0, 20):
-                episodes = await self.get_episodes(anime_id, page=page)
+                episodes = await self._fetch_cached_episodes(anime_id, page=page)
                 if not episodes:
                     break
                 ep_id = self._slug_index.get_episode_id_by_index(anime_id, episode_index)

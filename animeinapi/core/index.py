@@ -39,27 +39,32 @@ class SlugIndex:
         self._anime_slug_to_id[candidate] = aid
         self._anime_id_to_slug[aid] = candidate
 
-        # Also map the raw base slug to the first owner if not taken,
-        # and register '{base}-{id}' as an explicit alias for direct lookup.
+        # Only register the synthetic '{base}-{id}' alias if it does not shadow an existing key
         alias_with_id = f"{base}-{aid}"
-        self._anime_slug_to_id.setdefault(alias_with_id, aid)
+        if alias_with_id not in self._anime_slug_to_id:
+            self._anime_slug_to_id[alias_with_id] = aid
         return candidate
 
     def register_episode(
         self,
         episode_id: str,
-        episode_index: str,
+        episode_index: str | int | None,
         anime_id: str | None = None,
         anime_slug: str | None = None,
     ) -> str | None:
-        """Register an episode and return its flat slug if anime slug is known."""
+        """Register an episode and return its unique flat slug if anime slug is known."""
         eid = str(episode_id).strip()
-        idx_norm = slugify(str(episode_index)) or str(episode_index).strip()
+        if episode_index is None:
+            return None
+        if not isinstance(episode_index, str):
+            episode_index = str(episode_index)
+        raw_episode_index = episode_index.strip()
+        idx_norm = slugify(raw_episode_index) or raw_episode_index
         aid = str(anime_id).strip() if anime_id else None
 
         if aid and idx_norm:
             self._anime_ep_index_to_id[(aid, idx_norm)] = eid
-            self._anime_ep_index_to_id[(aid, str(episode_index).strip())] = eid
+            self._anime_ep_index_to_id[(aid, raw_episode_index)] = eid
 
         existing = self._ep_id_to_slug.get(eid)
         if existing:
@@ -70,6 +75,11 @@ class SlugIndex:
             return None
 
         ep_slug = make_episode_slug(resolved_anime_slug, idx_norm)
+        ep_owner = self._ep_slug_to_id.get(ep_slug)
+        if ep_owner is not None and ep_owner != eid:
+            # Disambiguate episode slug collision with episode ID
+            ep_slug = f"{ep_slug}-{eid}"
+
         self._ep_slug_to_id[ep_slug] = eid
         self._ep_id_to_slug[eid] = ep_slug
         return ep_slug

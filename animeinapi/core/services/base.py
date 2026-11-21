@@ -7,6 +7,7 @@ from ...config import Settings
 from ...models import AnimeSummary, Episode
 from ..cache import Cache, Cached
 from ..client import HttpClient, UpstreamError, UpstreamNotFound
+from ..constants import TTL_EPISODES
 from ..index import SlugIndex
 from ..slug import is_numeric_id, parse_episode_slug, slugify
 
@@ -88,6 +89,18 @@ class BaseService:
             self._index_episode(ep, anime_id=anime_id, anime_slug=anime_slug)
         return episodes
 
+    async def _fetch_cached_episodes(self, resolved_anime_id: str, page: int = 0) -> list[Episode]:
+        """Fetch cached episodes for an already-resolved numeric anime_id."""
+        get_ep_fn = getattr(self, "_get_episodes", None)
+        if get_ep_fn is None:
+            return []
+        cached = await self._cached(
+            ("episodes", resolved_anime_id, page),
+            TTL_EPISODES,
+            lambda: get_ep_fn(resolved_anime_id, page),
+        )
+        return cached.data
+
     async def resolve_anime_id(self, id_or_slug: str) -> str:
         raw = id_or_slug.strip()
         if is_numeric_id(raw):
@@ -115,7 +128,6 @@ class BaseService:
             hit = self._slug_index.get_anime_id(target_slug)
             if hit:
                 return hit
-            # Match by base title slug or prefix if disambiguated
             for item in res.items:
                 if slugify(item.title) == target_slug:
                     return item.id
@@ -146,16 +158,14 @@ class BaseService:
         if hit_by_idx:
             return hit_by_idx
 
-        get_episodes_fn = getattr(self, "get_episodes", None)
-        if get_episodes_fn is not None:
-            for page in range(0, 20):
-                episodes = await get_episodes_fn(anime_id, page=page)
-                if not episodes:
-                    break
-                hit_by_idx = self._slug_index.get_episode_id_by_index(anime_id, ep_index)
-                if hit_by_idx:
-                    return hit_by_idx
-                if len(episodes) < 30:
-                    break
+        for page in range(0, 20):
+            episodes = await self._fetch_cached_episodes(anime_id, page=page)
+            if not episodes:
+                break
+            hit_by_idx = self._slug_index.get_episode_id_by_index(anime_id, ep_index)
+            if hit_by_idx:
+                return hit_by_idx
+            if len(episodes) < 30:
+                break
 
         raise UpstreamNotFound(f"Episode slug not found: {id_or_slug}")
