@@ -62,8 +62,8 @@ def create_app() -> FastAPI:
         title="AnimeinAPI",
         version=__version__,
         description=(
-            "Provider API media stream anime berbasis komunitas Animein "
-            "dan storage cluster RAPSODI (direct MP4 multi-resolusi 360p-1080p)."
+            "Community-driven anime media streaming API gateway for Animein "
+            "and the RAPSODI storage cluster (multi-resolution direct MP4 360p-1080p)."
         ),
         lifespan=lifespan,
     )

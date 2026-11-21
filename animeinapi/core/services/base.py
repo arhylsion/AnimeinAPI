@@ -25,7 +25,7 @@ class BaseService:
         url = f"{self._settings.proxy_url}/{path}"
         payload = await self._http.get_json(url, params=params, headers=self._headers())
         if not isinstance(payload, dict):
-            raise UpstreamError("Payload upstream bukan objek JSON")
+            raise UpstreamError("Upstream payload is not a JSON object")
         if payload.get("error") is True or payload.get("status", 200) != 200:
             if payload.get("status") == 404:
                 raise UpstreamNotFound(str(payload.get("data", "Not found")))

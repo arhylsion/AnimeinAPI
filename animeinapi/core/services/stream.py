@@ -17,7 +17,7 @@ class StreamServiceMixin:
         data = payload.get("data", {})
         episode_raw = data.get("episode")
         if not episode_raw:
-            raise UpstreamError("Data episode kosong dari upstream")
+            raise UpstreamError("Empty episode data from upstream")
         episode = Episode.model_validate(episode_raw)
 
         streams: dict[str, list[StreamInfo]] = {}

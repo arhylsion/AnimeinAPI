@@ -12,16 +12,16 @@ class ErrorResponse(BaseModel):
 
 
 class BulkRequest(BaseModel):
-    ids: list[str] = Field(..., description="Daftar ID yang ingin diambil secara bulk")
+    ids: list[str] = Field(..., description="List of IDs to fetch in bulk")
 
 
 class BulkResult(BaseModel, Generic[T]):
     items: dict[str, T] = Field(
-        default_factory=dict, description="Dictionary hasil sukses per ID"
+        default_factory=dict, description="Map of successfully fetched items keyed by ID"
     )
     errors: dict[str, str] = Field(
-        default_factory=dict, description="Dictionary pesan error per ID yang gagal"
+        default_factory=dict, description="Map of error messages keyed by failed ID"
     )
-    total_requested: int = Field(0, description="Total ID yang diminta")
-    total_success: int = Field(0, description="Total ID yang berhasil")
-    total_failed: int = Field(0, description="Total ID yang gagal")
+    total_requested: int = Field(0, description="Total number of requested IDs")
+    total_success: int = Field(0, description="Total number of succeeded IDs")
+    total_failed: int = Field(0, description="Total number of failed IDs")

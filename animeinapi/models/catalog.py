@@ -26,7 +26,7 @@ class HomeData(BaseModel):
 
 
 class CatalogStats(BaseModel):
-    total_anime: int = Field(..., description="Total judul anime di katalog")
-    total_episodes: str = Field(..., description="Estimasi total episode yang tersedia")
-    total_genres: int = Field(..., description="Total kategori genre dan tema")
-    last_updated: str = Field(..., description="Waktu pengecekan statistik (WIB/ISO)")
+    total_anime: int = Field(..., description="Total anime titles in the catalog")
+    total_episodes: str = Field(..., description="Estimated total available episodes")
+    total_genres: int = Field(..., description="Total genre and theme categories")
+    last_updated: str = Field(..., description="Timestamp of last statistics check (WIB)")

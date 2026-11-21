@@ -41,7 +41,7 @@ class AnimeServiceMixin:
         data = payload.get("data") or {}
         movie = data.get("movie") if isinstance(data, dict) else None
         if not movie:
-            raise UpstreamError("Detail movie kosong dari upstream")
+            raise UpstreamError("Empty movie detail from upstream")
         return AnimeDetail.model_validate(movie)
 
     async def get_episodes(self, anime_id: str, page: int = 0) -> list[Episode]:

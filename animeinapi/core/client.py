@@ -80,7 +80,7 @@ class HttpClient:
         try:
             return httpx.Response(200, content=text).json()
         except ValueError as exc:
-            raise UpstreamError(f"Respons bukan JSON dari {url}") from exc
+            raise UpstreamError(f"Non-JSON response from {url}") from exc
 
     async def post_form(
         self,
@@ -125,7 +125,7 @@ class HttpClient:
                         self._on_upstream_result(False, dur)
                     raise UpstreamError(f"Upstream {url} -> HTTP {status_code}") from exc
                 logger.warning(
-                    "Percobaan %d/%d untuk %s: %s",
+                    "Attempt %d/%d failed for %s: %s",
                     attempt + 1,
                     self._settings.retries + 1,
                     url,
@@ -135,4 +135,4 @@ class HttpClient:
         dur = time.perf_counter() - start
         if self._on_upstream_result:
             self._on_upstream_result(False, dur)
-        raise UpstreamError(f"Upstream {url} gagal setelah retry") from last_error
+        raise UpstreamError(f"Upstream {url} failed after retries") from last_error
